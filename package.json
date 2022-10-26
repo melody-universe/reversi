@@ -1,0 +1,13 @@
+{
+  "name": "reversi",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --es-module-specifier-resolution=node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module"
+}
