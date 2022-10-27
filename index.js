@@ -1,6 +1,7 @@
-import { getValidMoves, makeNewBoard, setValue } from "./board";
+import { makeNewBoard, setValue } from "./board";
 import { BLACK, WHITE } from "./constants";
 import drawBoard from "./draw-board";
+import { getValidMoves } from "./get-valid-moves";
 
 const PLAYER_NAMES = {
   [BLACK]: "Black",
