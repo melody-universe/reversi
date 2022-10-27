@@ -1,10 +1,9 @@
-import promptSync from "prompt-sync";
-import { makeNewBoard, setValue } from "./board";
+import { makeNewBoard } from "./board";
 import { BLACK, WHITE } from "./constants";
 import drawBoard from "./draw-board";
+import getOptimalMove from "./get-optimal-move";
 import { getValidMoves } from "./get-valid-moves";
-
-const prompt = promptSync({ sigint: true });
+import prompt from "./prompt";
 
 const PLAYER_NAMES = {
   [BLACK]: "Black",
@@ -41,6 +40,13 @@ const playGame = () => {
           .join(", ")}`
       );
       const move = prompt("Move: ");
+      if (move === "best") {
+        const optimalMove = getOptimalMove(board, currentPlayer);
+        console.log(
+          `Best move: ${optimalMove.move} (score: ${optimalMove.score})`
+        );
+        continue;
+      }
       try {
         const key = JSON.stringify(JSON.parse(`[${move}]`));
         if (validMoves.has(key)) {
