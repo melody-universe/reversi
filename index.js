@@ -14,19 +14,24 @@ const playGame = () => {
   let currentPlayer = BLACK;
   let validMoves = getValidMoves(board, BLACK);
   console.log(
-    `${PLAYER_NAMES[currentPlayer]}'s turn. Valid moves: ${validMoves
+    `${PLAYER_NAMES[currentPlayer]}'s turn. Valid moves: ${[
+      ...validMoves.keys(),
+    ]
+      .map(JSON.parse)
       .map((move) => `(${move[0]}, ${move[1]})`)
       .join(", ")}`
   );
 
-  console.log("Assumimg black plays (2, 1)...");
-  setValue(board, 2, 1, BLACK);
-  setValue(board, 2, 2, BLACK);
+  console.log("Assuming black plays (2, 1)...");
+  board = validMoves.get(JSON.stringify([2, 1]));
   drawBoard(board);
   currentPlayer = WHITE;
   validMoves = getValidMoves(board, WHITE);
   console.log(
-    `${PLAYER_NAMES[currentPlayer]}'s turn. Valid moves: ${validMoves
+    `${PLAYER_NAMES[currentPlayer]}'s turn. Valid moves: ${[
+      ...validMoves.keys(),
+    ]
+      .map(JSON.parse)
       .map((move) => `(${move[0]}, ${move[1]})`)
       .join(", ")}`
   );

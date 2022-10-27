@@ -10,6 +10,8 @@ export const makeNewBoard = () => {
   return board;
 };
 
+export const copy = (board) => new Uint8Array(board);
+
 export const getBoardValue = (board) => (x, y) => board[y * SIZE + x];
 export const getValue = (board, x, y) => getBoardValue(board)(x, y);
 export const setValue = (board, x, y, value) => (board[y * SIZE + x] = value);
