@@ -24,14 +24,17 @@ export const getValidMoves = (board, player) => {
           dir > 0 ? SIZE - 1 : 0
         );
         if (
-          (xDirection === 0 || x * xDirection < (xBound + 1) * xDirection) &&
-          (yDirection === 0 || y * yDirection < (yBound + 1) * yDirection) &&
+          (xDirection === 0 ||
+            x * xDirection < (xBound - xDirection) * xDirection) &&
+          (yDirection === 0 ||
+            y * yDirection < (yBound - yDirection) * yDirection) &&
           getValue(x + xDirection, y + yDirection) === opponent
         ) {
           const swappedTiles = [
             [x, y],
             [x + xDirection, y + yDirection],
           ];
+          let isValid = false;
           swappedTilesLoop: for (
             let i = 2;
             (xDirection === 0 ||
@@ -42,6 +45,7 @@ export const getValidMoves = (board, player) => {
           ) {
             switch (getValue(x + i * xDirection, y + i * yDirection)) {
               case player:
+                isValid = true;
                 break swappedTilesLoop;
               case EMPTY:
                 continue directionLoop;
@@ -49,9 +53,16 @@ export const getValidMoves = (board, player) => {
                 swappedTiles.push([x + i * xDirection, y + i * yDirection]);
             }
           }
-          const moveBoard = copy(board);
-          swappedTiles.forEach(([x, y]) => setValue(moveBoard, x, y, player));
-          validMoves.set(JSON.stringify([x, y]), moveBoard);
+          if (isValid) {
+            const key = JSON.stringify([x, y]);
+            const moveBoard = validMoves.has(key)
+              ? validMoves.get(key)
+              : copy(board);
+            swappedTiles.forEach(([x, y]) => setValue(moveBoard, x, y, player));
+            if (!validMoves.has(key)) {
+              validMoves.set(key, moveBoard);
+            }
+          }
         }
       }
     }

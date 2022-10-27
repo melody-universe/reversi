@@ -9,5 +9,8 @@
   "author": "",
   "license": "ISC",
   "description": "",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "prompt-sync": "^4.2.0"
+  }
 }
