@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node --es-module-specifier-resolution=node index.js"
+    "start": "node --experimental-worker --es-module-specifier-resolution=node index.js"
   },
   "keywords": [],
   "author": "",
@@ -11,6 +11,7 @@
   "description": "",
   "type": "module",
   "dependencies": {
+    "mongodb": "^4.11.0",
     "prompt-sync": "^4.2.0"
   }
 }

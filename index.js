@@ -1,16 +1,18 @@
+import { existsSync } from "fs";
+import { mkdir } from "fs/promises";
 import { makeNewBoard } from "./board";
-import { BLACK, WHITE } from "./constants";
+import { BLACK, PLAYER_NAMES, WHITE } from "./constants";
 import drawBoard from "./draw-board";
+import getGoodMove from "./get-good-move";
 import getOptimalMove from "./get-optimal-move";
 import { getValidMoves } from "./get-valid-moves";
 import prompt from "./prompt";
 
-const PLAYER_NAMES = {
-  [BLACK]: "Black",
-  [WHITE]: "White",
-};
+if (!existsSync("cache")) {
+  await mkdir("cache");
+}
 
-const playGame = () => {
+const playGame = async () => {
   let board = makeNewBoard();
   let currentPlayer = BLACK;
   let gameOver = false;
@@ -41,20 +43,30 @@ const playGame = () => {
       );
       const move = prompt("Move: ");
       if (move === "best") {
-        const optimalMove = getOptimalMove(board, currentPlayer);
+        const optimalMove = await getOptimalMove(board, currentPlayer);
         console.log(
           `Best move: ${optimalMove.move} (score: ${optimalMove.score})`
         );
         continue;
-      }
-      try {
-        const key = JSON.stringify(JSON.parse(`[${move}]`));
-        if (validMoves.has(key)) {
-          nextBoard = validMoves.get(key);
+      } else if (move.startsWith("good")) {
+        let goodMove;
+        if (move === "good") {
+          goodMove = await getGoodMove(10, board, currentPlayer);
+        } else {
+          const depth = parseInt(move.substring(4).trim());
+          goodMove = await getGoodMove(depth, board, currentPlayer);
         }
-      } catch {}
-      if (nextBoard === null) {
-        console.log("Invalid move.");
+        console.log(`Good move: ${goodMove.move} (score: ${goodMove.score})`);
+      } else {
+        try {
+          const key = JSON.stringify(JSON.parse(`[${move}]`));
+          if (validMoves.has(key)) {
+            nextBoard = validMoves.get(key);
+          }
+        } catch {}
+        if (nextBoard === null) {
+          console.log("Invalid move.");
+        }
       }
     }
     currentPlayer = currentPlayer === BLACK ? WHITE : BLACK;

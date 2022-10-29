@@ -1,43 +1,62 @@
+import { MongoClient } from "mongodb";
+import { evaluate } from "./board";
 import { BLACK, WHITE } from "./constants";
 import getOpponent from "./get-opponent";
 import { getValidMoves } from "./get-valid-moves";
+import parseBigInt from "./parse-big-int";
 
 const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
 
-const getOptimalMove = (board, player, skippedLastTurn) => {
+const client = new MongoClient("mongodb://localhost:27017");
+client.connect();
+const db = client.db("reversi");
+const optimalMoves = db.collection("optimal-moves");
+if (!optimalMoves.indexExists("boardState")) {
+  await optimalMoves.createIndex({ boardState: 1 });
+}
+console.log(`${await optimalMoves.countDocuments()} saved optimal moves`);
+
+const getOptimalMove = async (board, player, skippedLastTurn) => {
+  const boardState = (
+    parseBigInt(board.join("")) <<
+    (1n + (player === BLACK ? 0n : 1n))
+  ).toString(36);
+
+  let move;
+  if ((move = await optimalMoves.findOne({ boardState }))) {
+    const { _id, boardState, ...returnValue } = move;
+    return returnValue;
+  }
+
   const validMoves = getValidMoves(board, player);
   if (validMoves.size === 0) {
     if (skippedLastTurn) {
-      return {
+      return cached({
         score: evaluate(board),
-      };
+      });
     } else {
-      return getOptimalMove(board, getOpponent(player), true);
+      return cached(await getOptimalMove(board, getOpponent(player), true));
     }
   }
   const direction = PLAYER_DIRECTIONS[player];
   const opponent = getOpponent(player);
   const moveKeys = [...validMoves.keys()];
-  return moveKeys.slice(1).reduce(
-    ({ move: bestMove, score: bestScore }, move) => {
-      const score = getOptimalMove(validMoves.get(move), opponent).score;
-      return score * direction > bestScore * direction
-        ? {
-            move,
-            score,
-          }
-        : { move: bestMove, score: bestScore };
-    },
-    {
-      move: moveKeys[0],
-      score: getOptimalMove(validMoves.get(moveKeys[0]), opponent).score,
+  let best = null;
+  for (const move of moveKeys) {
+    const optimalMove = await getOptimalMove(validMoves.get(move), opponent);
+    if (best === null) {
+      best = { move, ...optimalMove };
+      continue;
     }
-  );
+    if (optimalMove.score * direction > best.score * direction) {
+      best = { move, ...optimalMove };
+    }
+  }
+  return cached(best);
+
+  async function cached(optimalMove) {
+    await optimalMoves.insertOne({ boardState, ...optimalMove });
+    return optimalMove;
+  }
 };
 export default getOptimalMove;
-
-const evaluate = (board) =>
-  board.reduce(
-    (sum, player) => sum + (player === BLACK ? -1 : player === WHITE ? 1 : 0),
-    0
-  );
