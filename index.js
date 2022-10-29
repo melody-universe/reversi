@@ -1,5 +1,3 @@
-import { existsSync } from "fs";
-import { mkdir } from "fs/promises";
 import { makeNewBoard } from "./board";
 import { BLACK, PLAYER_NAMES, WHITE } from "./constants";
 import drawBoard from "./draw-board";
@@ -7,10 +5,6 @@ import getGoodMove from "./get-good-move";
 import getOptimalMove from "./get-optimal-move";
 import { getValidMoves } from "./get-valid-moves";
 import prompt from "./prompt";
-
-if (!existsSync("cache")) {
-  await mkdir("cache");
-}
 
 const playGame = async () => {
   let board = makeNewBoard();

@@ -6,7 +6,7 @@ import { getValidMoves } from "./get-valid-moves";
 import parseBigInt from "./parse-big-int";
 
 const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
-
+/*
 const client = new MongoClient("mongodb://localhost:27017");
 client.connect();
 const db = client.db("reversi");
@@ -15,6 +15,7 @@ if (!optimalMoves.indexExists("boardState")) {
   await optimalMoves.createIndex({ boardState: 1 });
 }
 console.log(`${await optimalMoves.countDocuments()} saved optimal moves`);
+*/
 
 const getOptimalMove = async (board, player, skippedLastTurn) => {
   const boardState = (
