@@ -6,3 +6,4 @@ export const PLAYER_NAMES = {
   [BLACK]: "Black",
   [WHITE]: "White",
 };
+export const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };

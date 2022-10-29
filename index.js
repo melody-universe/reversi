@@ -45,7 +45,7 @@ const playGame = async () => {
       } else if (move.startsWith("good")) {
         let goodMove;
         if (move === "good") {
-          goodMove = await getGoodMove(10, board, currentPlayer);
+          goodMove = await getGoodMove(board, currentPlayer);
         } else {
           const depth = parseInt(move.substring(4).trim());
           goodMove = await getGoodMove(depth, board, currentPlayer);

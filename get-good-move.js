@@ -1,21 +1,10 @@
-import { evaluate, evaluateForGood } from "./board";
-import { BLACK, PLAYER_NAMES, WHITE } from "./constants";
+import { Worker } from "worker_threads";
+import { evaluate } from "./board";
+import { PLAYER_DIRECTIONS, PLAYER_NAMES } from "./constants";
 import getOpponent from "./get-opponent";
 import { getValidMoves } from "./get-valid-moves";
 
-const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
-
-const getGoodMove = (
-  initDepth,
-  board,
-  player,
-  depth = initDepth,
-  skippedLastTurn
-) => {
-  if (depth === 0) {
-    return { score: evaluateForGood(board) };
-  }
-
+const getGoodMove = async (board, player, skippedLastTurn) => {
   const validMoves = getValidMoves(board, player);
   if (validMoves.size === 0) {
     if (skippedLastTurn) {
@@ -23,24 +12,38 @@ const getGoodMove = (
         score: evaluate(board) * 100,
       };
     } else {
-      return getGoodMove(initDepth, board, getOpponent(player), depth, true);
+      return getGoodMove(board, getOpponent(player), true);
     }
   }
 
   const direction = PLAYER_DIRECTIONS[player];
   const opponent = getOpponent(player);
   const moveKeys = [...validMoves.keys()];
-  const results = moveKeys.map((move) => ({
-    ...getGoodMove(initDepth, validMoves.get(move), opponent, depth - 1),
-    move,
-  }));
+  const results = await Promise.all(
+    moveKeys.map(async (move) => {
+      const goodMove = await new Promise((resolve, reject) => {
+        const worker = new Worker("./get-good-move-service.js", {
+          workerData: {
+            boardString: validMoves.get(move).join(""),
+            player: opponent,
+          },
+        });
+        worker.on("message", resolve);
+        worker.on("error", reject);
+        worker.on("exit", (exitCode) => {
+          if (exitCode !== 0) {
+            reject(`Worker exited with non-zero exit code: ${exitCode}`);
+          }
+        });
+      });
+      console.log(
+        `${PLAYER_NAMES[player]}: ${move} (score: ${goodMove.score})`
+      );
+      return { ...goodMove, move };
+    })
+  );
   let best = null;
   for (const goodMove of results) {
-    if (depth === initDepth) {
-      console.log(
-        `${PLAYER_NAMES[player]}: ${goodMove.move} (score: ${goodMove.score})`
-      );
-    }
     if (best === null) {
       best = goodMove;
       continue;
