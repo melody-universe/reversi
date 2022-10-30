@@ -1,6 +1,7 @@
 import { workerData, parentPort } from "worker_threads";
-import { evaluate, evaluateForGood } from "./board";
+import { evaluate } from "./board";
 import { PLAYER_DIRECTIONS } from "./constants";
+import { evaluateForGood } from "./evaluate-for-good";
 import getOpponent from "./get-opponent";
 import { getValidMoves } from "./get-valid-moves";
 

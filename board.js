@@ -3,10 +3,12 @@ import { BLACK, EMPTY, SIZE, WHITE } from "./constants";
 export const makeNewBoard = () => {
   const board = new Uint8Array(SIZE * SIZE);
   board.fill(EMPTY);
-  setValue(board, 2, 2, WHITE);
-  setValue(board, 3, 3, WHITE);
-  setValue(board, 3, 2, BLACK);
-  setValue(board, 2, 3, BLACK);
+  const lowerHalf = SIZE / 2 - 1;
+  const upperHalf = SIZE / 2;
+  setValue(board, lowerHalf, lowerHalf, WHITE);
+  setValue(board, upperHalf, upperHalf, WHITE);
+  setValue(board, upperHalf, lowerHalf, BLACK);
+  setValue(board, lowerHalf, upperHalf, BLACK);
   return board;
 };
 
@@ -21,27 +23,3 @@ export const evaluate = (board) =>
     (sum, player) => sum + (player === BLACK ? -1 : player === WHITE ? 1 : 0),
     0
   );
-
-export const evaluateForGood = (board) =>
-  board.reduce((sum, player, index) => {
-    let factor;
-    if (
-      index === 0 ||
-      index === SIZE - 1 ||
-      index === SIZE * (SIZE - 1) ||
-      index === SIZE * SIZE - 1
-    ) {
-      factor = 6;
-    } else if (
-      (index > 0 && index < SIZE - 1) ||
-      index % SIZE === 0 ||
-      index % SIZE === SIZE - 1 ||
-      index > SIZE * (SIZE - 1)
-    ) {
-      factor = 3;
-    } else {
-      factor = 1;
-    }
-
-    return sum + (player === BLACK ? -1 : player === WHITE ? 1 : 0) * factor;
-  }, 0);

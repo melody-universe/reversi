@@ -1,8 +1,8 @@
 import { Worker } from "worker_threads";
-import { evaluate } from "./board";
-import { PLAYER_DIRECTIONS, PLAYER_NAMES } from "./constants";
-import getOpponent from "./get-opponent";
-import { getValidMoves } from "./get-valid-moves";
+import { evaluate } from "../board";
+import { PLAYER_DIRECTIONS, PLAYER_NAMES } from "../constants";
+import getOpponent from "../get-opponent";
+import { getValidMoves } from "../get-valid-moves";
 
 const getGoodMove = async (board, player, skippedLastTurn) => {
   const validMoves = getValidMoves(board, player);

@@ -1,7 +1,7 @@
 import { makeNewBoard } from "./board";
 import { BLACK, PLAYER_NAMES, WHITE } from "./constants";
 import drawBoard from "./draw-board";
-import getGoodMove from "./get-good-move";
+import getGoodMove from "./good-move/get-good-move";
 import getOptimalMove from "./get-optimal-move";
 import { getValidMoves } from "./get-valid-moves";
 import prompt from "./prompt";
@@ -9,6 +9,7 @@ import prompt from "./prompt";
 const playGame = async () => {
   let board = makeNewBoard();
   let currentPlayer = BLACK;
+  let turn = 0;
   let gameOver = false;
   let skippedLastTurn = false;
   while (!gameOver) {
@@ -37,7 +38,7 @@ const playGame = async () => {
       );
       const move = prompt("Move: ");
       if (move === "best") {
-        const optimalMove = await getOptimalMove(board, currentPlayer);
+        const optimalMove = await getOptimalMove(board, turn, currentPlayer);
         console.log(
           `Best move: ${optimalMove.move} (score: ${optimalMove.score})`
         );
@@ -65,6 +66,7 @@ const playGame = async () => {
     }
     currentPlayer = currentPlayer === BLACK ? WHITE : BLACK;
     board = nextBoard;
+    turn++;
   }
 
   drawBoard(board);

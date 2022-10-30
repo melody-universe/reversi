@@ -1,16 +1,68 @@
-import { appendFileSync } from "fs";
+import { mkdirSync } from "fs";
+import { join } from "path";
+import { Worker } from "worker_threads";
 import { evaluate } from "./board";
-import { BLACK, WHITE } from "./constants";
+import { BLACK, MAX_THREAD_COUNT, SIZE, WHITE } from "./constants";
+import getDirName from "./cache/get-dir-name";
 import getOpponent from "./get-opponent";
 import { getValidMoves } from "./get-valid-moves";
-import parseBigInt from "./parse-big-int";
+import parseBigInt from "./math/parse-big-int";
+import setup from "./cache/setup";
+import save from "./cache/save";
 
 const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
 
-const getOptimalMove = async (board, player, skippedLastTurn) => {
-  const boardState = (
-    parseBigInt(board.join("")) <<
-    (1n + (player === BLACK ? 0n : 1n))
+const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
+  await setup();
+  const todo = new Map([turn, [{ board, player }]]);
+  let returnLeaf;
+  let maxTurn = turn;
+  const workers = new Map();
+
+  queueWorker();
+
+  while (workers.size > 0) {
+    await new Promise((resolve) => setTimeout(resolve));
+  }
+
+  function queueWorker() {
+    const workerTurn = maxTurn;
+    const turns = todo.get(workerTurn);
+    const state = turns.pop();
+    const worker = new Worker("./get-optimal-move-service.js", {
+      workerData: { turn: workerTurn, ...state },
+    });
+    worker.on("message", ({ type, value }) => {
+      switch (type) {
+        case "return":
+          save({ ...workers.get(worker), score: value });
+          break;
+        case "find":
+          break;
+      }
+    });
+    worker.on("error", (error) => {
+      throw error;
+    });
+    worker.on("exit", (exitCode) => {
+      if (exitCode !== 0) {
+        throw new Error(
+          `get-optimal-move-service.js exited with non-zero exit code: ${exitCode}`
+        );
+      }
+    });
+    workers.set(worker, state);
+    if (turns.length === 0) {
+      todo.delete(workerTurn);
+      const todoTurns = [...todo.keys()];
+      maxTurn = todoTurns.length ? Math.max(todoTurns) : -1;
+    }
+  }
+  return;
+  const boardStack = [board];
+  BigInt(3).toString(64);
+  const boardState = Buffer.from()(
+    parseBigInt(board.join("")) << (1n + (player === BLACK ? 0n : 1n))
   ).toString(36);
 
   let move;
