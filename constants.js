@@ -2,7 +2,7 @@ export const EMPTY = 0;
 export const WHITE = 1;
 export const BLACK = 2;
 export const SIZE = 4;
-export const CACHE_TURN_FREQUENCY = 1;
+export const CACHE_TURN_FREQUENCY = 2;
 export const PLAYER_NAMES = {
   [BLACK]: "Black",
   [WHITE]: "White",

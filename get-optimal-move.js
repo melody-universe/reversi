@@ -1,45 +1,53 @@
-import { mkdirSync } from "fs";
-import { join } from "path";
 import { Worker } from "worker_threads";
 import { evaluate } from "./board";
-import { BLACK, MAX_THREAD_COUNT, SIZE, WHITE } from "./constants";
-import getDirName from "./cache/get-dir-name";
+import { BLACK, MAX_THREAD_COUNT, WHITE } from "./constants";
 import getOpponent from "./get-opponent";
 import { getValidMoves } from "./get-valid-moves";
 import parseBigInt from "./math/parse-big-int";
+import stateToByteArray from "./math/state-to-byte-array";
 import setup from "./cache/setup";
-import save from "./cache/save";
+import getTurnCollection from "./cache/get-turn-collection";
+import report from "./cache/report";
 
 const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
 
-const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
+const getOptimalMove = async (board, turn, player) => {
   await setup();
-  const todo = new Map([turn, [{ board, player }]]);
-  let returnLeaf;
+  const turnCollection = await getTurnCollection(turn);
+  const stateHash = stateToByteArray({ board, player });
+  const returnValue = await turnCollection.findOne({ state: stateHash });
+  if (returnValue) {
+    return returnValue;
+  }
+
+  const reportInterval = setInterval(report, 10000);
+
+  const todo = new Map();
+  todo.set(turn, [{ board, player }]);
   let maxTurn = turn;
   const workers = new Map();
 
   queueWorker();
 
   while (workers.size > 0) {
+    while (workers.size < MAX_THREAD_COUNT && maxTurn >= 0) {
+      queueWorker();
+    }
     await new Promise((resolve) => setTimeout(resolve));
   }
 
   function queueWorker() {
     const workerTurn = maxTurn;
-    const turns = todo.get(workerTurn);
-    const state = turns.pop();
+    const states = todo.get(workerTurn);
+    const state = states.pop();
     const worker = new Worker("./get-optimal-move-service.js", {
       workerData: { turn: workerTurn, ...state },
     });
-    worker.on("message", ({ type, value }) => {
-      switch (type) {
-        case "return":
-          save({ ...workers.get(worker), score: value });
-          break;
-        case "find":
-          break;
-      }
+    worker.on("message", async ({ turn, needs }) => {
+      needs.forEach((state) => {
+        addTodo(turn, state);
+      });
+      addTodo(workerTurn, state);
     });
     worker.on("error", (error) => {
       throw error;
@@ -50,17 +58,32 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
           `get-optimal-move-service.js exited with non-zero exit code: ${exitCode}`
         );
       }
+      workers.delete(worker);
+      if (maxTurn >= 0) {
+        queueWorker();
+      }
     });
     workers.set(worker, state);
-    if (turns.length === 0) {
+    if (states.length === 0) {
       todo.delete(workerTurn);
       const todoTurns = [...todo.keys()];
       maxTurn = todoTurns.length ? Math.max(todoTurns) : -1;
     }
+
+    function addTodo(turn, state) {
+      let states = todo.get(turn);
+      if (!states) {
+        states = [];
+        todo.set(turn, states);
+      }
+      states.push(state);
+    }
   }
-  return;
+  clearInterval(reportInterval);
+  await report();
+  return await turnCollection.findOne({ state: stateHash });
+
   const boardStack = [board];
-  BigInt(3).toString(64);
   const boardState = Buffer.from()(
     parseBigInt(board.join("")) << (1n + (player === BLACK ? 0n : 1n))
   ).toString(36);
@@ -95,11 +118,6 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
       best = { move, ...optimalMove };
     }
   }
-  return cached(best);
-
-  async function cached(optimalMove) {
-    await optimalMoves.insertOne({ boardState, ...optimalMove });
-    return optimalMove;
-  }
+  return best;
 };
 export default getOptimalMove;

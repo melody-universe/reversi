@@ -5,6 +5,7 @@ import getGoodMove from "./good-move/get-good-move";
 import getOptimalMove from "./get-optimal-move";
 import { getValidMoves } from "./get-valid-moves";
 import prompt from "./prompt";
+import clear from "./cache/clear";
 
 const playGame = async () => {
   let board = makeNewBoard();
@@ -43,6 +44,8 @@ const playGame = async () => {
           `Best move: ${optimalMove.move} (score: ${optimalMove.score})`
         );
         continue;
+      } else if (move === "clear") {
+        await clear();
       } else if (move.startsWith("good")) {
         let goodMove;
         if (move === "good") {

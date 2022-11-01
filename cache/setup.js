@@ -1,41 +1,37 @@
-import { appendFile, mkdir, open, stat, truncate } from "fs/promises";
-import { join } from "path";
+import { Collection, Db, MongoClient } from "mongodb";
 import { CACHE_TURN_FREQUENCY, SIZE } from "../constants";
-import { LEAF_SIZE_IN_BYTES } from "./constants";
-import getDirName from "./get-dir-name";
-import { saveQueue, stopSaving } from "./save";
 
-export const cacheFolder = join(
-  getDirName(import.meta.url),
-  "..",
-  "data",
-  `size-${SIZE}`
-);
+/** @type {MongoClient} */
+export let client;
+
+/** @type {Db} */
+export let database;
+
+/** @type {Map<number, Collection>} */
+export const collections = new Map();
 
 const setup = async () => {
-  await mkdir(cacheFolder, { recursive: true });
-  const filePromises = [];
+  client = new MongoClient("mongodb://localhost:27017");
+  await client.connect();
+  database = client.db(`reversi-${SIZE}`);
+  const existingCollections = new Set(
+    (await database.collections()).map(
+      (collection) => collection.collectionName
+    )
+  );
   for (
-    let i = CACHE_TURN_FREQUENCY;
-    i < SIZE * SIZE - 5;
-    i += CACHE_TURN_FREQUENCY
+    let turn = CACHE_TURN_FREQUENCY;
+    turn < SIZE * SIZE;
+    turn += CACHE_TURN_FREQUENCY
   ) {
-    saveQueue.set(i, []);
-    filePromises.push(
-      (async () => {
-        const fileName = join(cacheFolder, `${i}`);
-        await appendFile(fileName, "").catch(null);
-        const totalSize = (await stat(fileName)).size;
-        if (totalSize % LEAF_SIZE_IN_BYTES === 0) {
-          return;
-        }
-        await truncate(
-          fileName,
-          Math.floor(totalSize / LEAF_SIZE_IN_BYTES) * LEAF_SIZE_IN_BYTES
-        );
-      })()
-    );
+    const collectionName = `turn-${turn}`;
+    const collection = database.collection(collectionName);
+    if (!existingCollections.has(collectionName)) {
+      await collection.insertOne({});
+      await collection.createIndex({ state: 1 }, { unique: true });
+      await collection.deleteOne({});
+    }
+    collections.set(turn, collection);
   }
-  await Promise.all(filePromises);
 };
 export default setup;

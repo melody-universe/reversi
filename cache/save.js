@@ -1,21 +1,14 @@
-import { appendFile } from "fs/promises";
-import leafToByteArray from "../math/leaf-to-byte-array";
-import { cacheFolder } from "./setup";
+import stateToByteArray from "../math/state-to-byte-array";
+import { collections } from "./setup";
 
-export const saveQueue = new Map();
 const save = async (turn, leaf) => {
-  const fileName = join(cacheFolder, `${turn}`);
-  await appendFile(fileName, leafToByteArray(leaf));
+  const collection = collections.get(turn);
+  const { score, ...state } = leaf;
+  const stateBytes = stateToByteArray(state);
+  await collection.updateOne(
+    { state: stateBytes },
+    { score },
+    { upsert: true }
+  );
 };
 export default save;
-
-const savingIntervals = [];
-export const startSaving = (turn) => {};
-
-export const stopSaving = () => {
-  if (savingIntervals.length > 0) {
-    for (const interval of savingIntervals) {
-      clearInterval(interval);
-    }
-  }
-};
