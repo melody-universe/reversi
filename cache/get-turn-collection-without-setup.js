@@ -1,9 +1,8 @@
-import { MongoClient } from "mongodb";
 import { SIZE } from "../constants";
+import connect, { client } from "./connect";
 
 const getTurnCollectionWithoutSetup = async (turn) => {
-  const client = new MongoClient("mongodb://localhost:27017");
-  await client.connect();
+  await connect();
   const database = client.db(`reversi-${SIZE}`);
   return database.collection(`turn-${turn}`);
 };

@@ -1,4 +1,5 @@
 import { Collection } from "mongodb";
+import { exit } from "process";
 import { parentPort, workerData } from "worker_threads";
 import { evaluate } from "./board";
 import getTurnCollectionWithoutSetup from "./cache/get-turn-collection-without-setup";
@@ -14,8 +15,10 @@ if (nextCacheTurn >= SIZE * SIZE - 4) {
   nextCacheTurn = undefined;
 }
 /** @type {Collection} */
-const collection =
+const nextTurnCollection =
   nextCacheTurn && (await getTurnCollectionWithoutSetup(nextCacheTurn));
+/** @type {Collection} */
+const collection = await getTurnCollectionWithoutSetup(turn);
 const needs = [];
 
 const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
@@ -36,25 +39,29 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
   const pullFromCache = turn + 1 === nextCacheTurn;
   for (const move of moveKeys) {
     const optimalMove = pullFromCache
-      ? await collection.findOne({
+      ? await nextTurnCollection.findOne({
           state: stateToByteArray({
             board: validMoves.get(move),
             player: opponent,
           }),
         })
-      : getOptimalMove(validMoves.get(move), turn + 1, opponent);
-    if (!optimalMove) {
-      needs.push({ board: validMoves.get(move), player: opponent });
+      : await getOptimalMove(validMoves.get(move), turn + 1, opponent);
+    if (!optimalMove && pullFromCache) {
+      needs.push({
+        turn: turn + 1,
+        board: validMoves.get(move),
+        player: opponent,
+      });
     }
     if (needs.length > 0) {
       continue;
     }
     if (best === null) {
-      best = { move, ...optimalMove };
+      best = { ...optimalMove, move: JSON.parse(move) };
       continue;
     }
     if (optimalMove.score * direction > best.score * direction) {
-      best = { move, ...optimalMove };
+      best = { ...optimalMove, move: JSON.parse(move) };
     }
   }
   return best;
@@ -62,11 +69,13 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
 
 const move = await getOptimalMove(board, turn, player);
 if (needs.length > 0) {
-  parentPort.postMessage({ turn: nextCacheTurn, needs });
-} else {
+  parentPort.postMessage(needs);
+} else if (turn > 0 && turn % (SIZE * SIZE) === 0) {
   await collection.updateOne(
     { state: stateToByteArray({ board, player }) },
     { $set: { move: move.move, score: move.score } },
     { upsert: true }
   );
 }
+parentPort.postMessage(move);
+exit();

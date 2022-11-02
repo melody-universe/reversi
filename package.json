@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node --experimental-worker --es-module-specifier-resolution=node --no-warnings index.js"
+    "start": "node --experimental-worker --es-module-specifier-resolution=node --no-warnings index.js",
+    "test": "node --es-module-specifier-resolution=node --no-warnings test.js"
   },
   "keywords": [],
   "author": "",

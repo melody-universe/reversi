@@ -1,8 +1,6 @@
-import { Collection, Db, MongoClient } from "mongodb";
+import { Collection, Db } from "mongodb";
+import connect, { client } from "./connect";
 import { CACHE_TURN_FREQUENCY, SIZE } from "../constants";
-
-/** @type {MongoClient} */
-export let client;
 
 /** @type {Db} */
 export let database;
@@ -11,8 +9,7 @@ export let database;
 export const collections = new Map();
 
 const setup = async () => {
-  client = new MongoClient("mongodb://localhost:27017");
-  await client.connect();
+  await connect();
   database = client.db(`reversi-${SIZE}`);
   const existingCollections = new Set(
     (await database.collections()).map(
@@ -21,7 +18,7 @@ const setup = async () => {
   );
   for (
     let turn = CACHE_TURN_FREQUENCY;
-    turn < SIZE * SIZE;
+    turn < SIZE * SIZE - 4;
     turn += CACHE_TURN_FREQUENCY
   ) {
     const collectionName = `turn-${turn}`;
