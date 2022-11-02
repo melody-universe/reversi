@@ -8,4 +8,4 @@ export const PLAYER_NAMES = {
   [WHITE]: "White",
 };
 export const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
-export const MAX_THREAD_COUNT = 50;
+export const MAX_THREAD_COUNT = 100;

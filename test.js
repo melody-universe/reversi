@@ -3,18 +3,27 @@ import clear from "./cache/clear";
 import connect, { client } from "./cache/connect";
 import report from "./cache/report";
 import setup from "./cache/setup";
-import { SIZE } from "./constants";
+import { PLAYER_NAMES, SIZE } from "./constants";
+import drawBoard from "./draw-board";
+import byteArrayToState from "./math/byte-array-to-state";
 
 await connect();
 const database = client.db(`reversi-${SIZE}`);
 const collections = await database.collections();
 await Promise.all(
   collections.map(async (collection) => {
-    console.log(
-      `${collection.collectionName}: ${await collection.countDocuments({
-        score: { $exists: true },
-      })}`
-    );
+    const doc = await collection.findOne({
+      score: { $exists: true },
+    });
+    if (!doc) {
+      return;
+    }
+    const { board, player } = byteArrayToState(doc.state.buffer);
+    console.log(`${collection.collectionName}:`);
+    drawBoard(board);
+    console.log(`Player: ${PLAYER_NAMES[player]}`);
+    console.log(`Best move: ${doc.move}`);
+    console.log(`Score: ${doc.score}`);
   })
 );
 // await setup();
