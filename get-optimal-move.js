@@ -22,11 +22,23 @@ const getOptimalMove = async (board, turn, player) => {
   let returnValue;
   const mainTurn = turn;
 
-  const reportInterval = setInterval(async () => {
-    console.log(performance.now());
-    await report();
+  let reporting = true;
+  async function writeReport() {
+    const start = performance.now();
+    const counts = await report();
+    const end = performance.now();
+    console.log(
+      `Generated report in ${((end - start) / 1000).toFixed(2)} seconds`
+    );
+    counts.forEach(({ turn, count }) =>
+      console.log(`${`${turn}`.padStart(2)}: ${count}`)
+    );
     console.log(`${workers.size} workers`);
-  }, 5000);
+    if (reporting) {
+      setTimeout(writeReport, 30000);
+    }
+  }
+  writeReport();
 
   if (
     !(
@@ -75,7 +87,7 @@ const getOptimalMove = async (board, turn, player) => {
   }
 
   function queueWorker(turn, board, player) {
-    const workerTurn = maxTurn;
+    const workerTurn = turn;
     const worker = new Worker("./get-optimal-move-service.js", {
       workerData: {
         turn: workerTurn,

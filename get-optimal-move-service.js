@@ -11,10 +11,11 @@ import stateToByteArray from "./math/state-to-byte-array";
 
 const { board, turn, player, postReturnValue } = workerData;
 let nextCacheTurn =
-  turn + (CACHE_TURN_FREQUENCY - (turn % CACHE_TURN_FREQUENCY));
+  Math.ceil((turn + 1) / CACHE_TURN_FREQUENCY) * CACHE_TURN_FREQUENCY;
 if (nextCacheTurn >= SIZE * SIZE - 4) {
   nextCacheTurn = undefined;
 }
+
 /** @type {Collection} */
 const nextTurnCollection =
   nextCacheTurn && (await getTurnCollectionWithoutSetup(nextCacheTurn));
@@ -76,7 +77,7 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
 };
 
 const move = await getOptimalMove(board, turn, player);
-if (turn > 0 && turn % (SIZE * SIZE) === 0) {
+if (turn > 0 && turn % CACHE_TURN_FREQUENCY === 0) {
   await collection.updateOne(
     { state: stateToByteArray({ board, player }) },
     { $set: { move: move.move, score: move.score } },
