@@ -1,18 +1,13 @@
 import { Worker } from "worker_threads";
-import { evaluate } from "./board";
-import { BLACK, MAX_THREAD_COUNT, SIZE, WHITE } from "./constants";
-import getOpponent from "./get-opponent";
-import { getValidMoves } from "./get-valid-moves";
-import parseBigInt from "./math/parse-big-int";
+import { CACHE_TURN_FREQUENCY, MAX_THREAD_COUNT, SIZE } from "./constants";
 import stateToByteArray from "./math/state-to-byte-array";
 import setup, { collections } from "./cache/setup";
 import report from "./cache/report";
-
-const PLAYER_DIRECTIONS = { [BLACK]: -1, [WHITE]: 1 };
+import byteArrayToState from "./math/byte-array-to-state";
 
 const getOptimalMove = async (board, turn, player) => {
   await setup();
-  if (turn > 0 && turn % (SIZE * SIZE) === 0) {
+  if (collections.has(turn)) {
     const turnCollection = collections.get(turn);
     const stateHash = stateToByteArray({ board, player });
     const returnValue = await turnCollection.findOne({ state: stateHash });
@@ -21,118 +16,108 @@ const getOptimalMove = async (board, turn, player) => {
     }
   }
 
-  const todo = new Map();
-  todo.set(turn, [{ board, player }]);
-  let maxTurn = turn;
+  let maxTurn =
+    Math.floor((SIZE * SIZE - 5) / CACHE_TURN_FREQUENCY) * CACHE_TURN_FREQUENCY;
   const workers = new Map();
   let returnValue;
+  const mainTurn = turn;
 
   const reportInterval = setInterval(async () => {
+    console.log(performance.now());
     await report();
     console.log(`${workers.size} workers`);
-  }, 3000);
+  }, 5000);
 
-  queueWorker();
-
-  while (workers.size > 0 || maxTurn >= 0) {
-    while (workers.size < MAX_THREAD_COUNT && maxTurn >= 0) {
-      queueWorker();
-    }
-    await new Promise((resolve) => setTimeout(resolve));
+  if (
+    !(
+      await Promise.all(
+        [...collections.values()].map((collection) =>
+          collection.findOne({ score: { $exists: false } })
+        )
+      )
+    ).some((i) => i)
+  ) {
+    queueWorker(turn, board, player);
   }
 
-  function queueWorker() {
+  while (returnValue === undefined && maxTurn > 0) {
+    if (workers.size < MAX_THREAD_COUNT) {
+      let workersToQueue = MAX_THREAD_COUNT - workers.size;
+      while (workersToQueue > 0 && collections.has(maxTurn)) {
+        const collection = collections.get(maxTurn);
+        let queuedWorkers = 0;
+        await collection
+          .find({ score: { $exists: false } })
+          .limit(workersToQueue)
+          .forEach(({ state: stateHash }) => {
+            const { board, player } = byteArrayToState(stateHash.buffer);
+            queueWorker(maxTurn, board, player);
+            queuedWorkers++;
+          });
+        workersToQueue -= queuedWorkers;
+        if (workersToQueue > 0) {
+          maxTurn -= CACHE_TURN_FREQUENCY;
+        }
+      }
+    }
+    while (workers.size > 0) {
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+    maxTurn =
+      Math.floor((SIZE * SIZE - 5) / CACHE_TURN_FREQUENCY) *
+      CACHE_TURN_FREQUENCY;
+    while (
+      maxTurn > 0 &&
+      !(await collections.get(maxTurn).findOne({ score: { $exists: false } }))
+    ) {
+      maxTurn -= CACHE_TURN_FREQUENCY;
+    }
+  }
+
+  function queueWorker(turn, board, player) {
     const workerTurn = maxTurn;
-    const states = todo.get(workerTurn);
-    const state = states.pop();
     const worker = new Worker("./get-optimal-move-service.js", {
-      workerData: { turn: workerTurn, ...state },
+      workerData: {
+        turn: workerTurn,
+        board,
+        player,
+        postReturnValue: workerTurn === mainTurn,
+      },
     });
     worker.on("message", async (message) => {
-      if (Object.getPrototypeOf(message) === Array.prototype) {
-        message.forEach(({ turn, ...state }) => {
-          addTodo(turn, state);
-        });
-        addTodo(workerTurn, state);
-      } else if (workerTurn === turn) {
-        returnValue = { ...turn, ...message };
-      }
+      returnValue = { turn, ...message };
     });
     worker.on("error", (error) => {
       throw error;
     });
-    worker.on("exit", (exitCode) => {
+    worker.on("exit", async (exitCode) => {
       if (exitCode !== 0) {
         throw new Error(
           `get-optimal-move-service.js exited with non-zero exit code: ${exitCode}`
         );
       }
+      let queuedWorker = false;
+      while (maxTurn > 0 && !queuedWorker) {
+        const collection = collections.get(maxTurn);
+        const lockedMaxTurn = maxTurn;
+        const stateHash = await collection.findOne({
+          score: { $exists: false },
+        })?.state;
+        if (stateHash) {
+          const { board, player } = byteArrayToState(stateHash);
+          queueWorker(lockedMaxTurn, board, player);
+          queuedWorker = true;
+        } else {
+          maxTurn = lockedMaxTurn - CACHE_TURN_FREQUENCY;
+        }
+      }
       workers.delete(worker);
-      if (maxTurn >= 0) {
-        queueWorker();
-      }
     });
-    workers.set(worker, state);
-    if (states.length === 0) {
-      todo.delete(workerTurn);
-      calculateMaxTurn();
-    }
-
-    function addTodo(turn, state) {
-      let states = todo.get(turn);
-      if (!states) {
-        states = [];
-        todo.set(turn, states);
-        calculateMaxTurn();
-      }
-      states.push(state);
-    }
-
-    function calculateMaxTurn() {
-      const todoTurns = [...todo.keys()];
-      maxTurn = todoTurns.length ? Math.max(...todoTurns) : -1;
-    }
+    workers.set(worker, { turn, board, player });
   }
   clearInterval(reportInterval);
   await report();
   console.log(returnValue);
   return returnValue;
-
-  const boardStack = [board];
-  const boardState = Buffer.from()(
-    parseBigInt(board.join("")) << (1n + (player === BLACK ? 0n : 1n))
-  ).toString(36);
-
-  let move;
-  if ((move = await optimalMoves.findOne({ boardState }))) {
-    const { _id, boardState, ...returnValue } = move;
-    return returnValue;
-  }
-
-  const validMoves = getValidMoves(board, player);
-  if (validMoves.size === 0) {
-    if (skippedLastTurn) {
-      return cached({
-        score: evaluate(board),
-      });
-    } else {
-      return cached(await getOptimalMove(board, getOpponent(player), true));
-    }
-  }
-  const direction = PLAYER_DIRECTIONS[player];
-  const opponent = getOpponent(player);
-  const moveKeys = [...validMoves.keys()];
-  let best = null;
-  for (const move of moveKeys) {
-    const optimalMove = await getOptimalMove(validMoves.get(move), opponent);
-    if (best === null) {
-      best = { move, ...optimalMove };
-      continue;
-    }
-    if (optimalMove.score * direction > best.score * direction) {
-      best = { move, ...optimalMove };
-    }
-  }
-  return best;
 };
 export default getOptimalMove;

@@ -6,9 +6,10 @@ import getTurnCollectionWithoutSetup from "./cache/get-turn-collection-without-s
 import { CACHE_TURN_FREQUENCY, PLAYER_DIRECTIONS, SIZE } from "./constants";
 import getOpponent from "./get-opponent";
 import { getValidMoves } from "./get-valid-moves";
+import { hasValidMoves } from "./has-valid-moves";
 import stateToByteArray from "./math/state-to-byte-array";
 
-const { board, turn, player } = workerData;
+const { board, turn, player, postReturnValue } = workerData;
 let nextCacheTurn =
   turn + (CACHE_TURN_FREQUENCY - (turn % CACHE_TURN_FREQUENCY));
 if (nextCacheTurn >= SIZE * SIZE - 4) {
@@ -19,7 +20,7 @@ const nextTurnCollection =
   nextCacheTurn && (await getTurnCollectionWithoutSetup(nextCacheTurn));
 /** @type {Collection} */
 const collection = await getTurnCollectionWithoutSetup(turn);
-const needs = [];
+let needMoreCache = false;
 
 const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
   const validMoves = getValidMoves(board, player);
@@ -38,22 +39,29 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
   let best = null;
   const pullFromCache = turn + 1 === nextCacheTurn;
   for (const move of moveKeys) {
-    const optimalMove = pullFromCache
-      ? await nextTurnCollection.findOne({
-          state: stateToByteArray({
-            board: validMoves.get(move),
-            player: opponent,
-          }),
-        })
-      : await getOptimalMove(validMoves.get(move), turn + 1, opponent);
-    if (!optimalMove && pullFromCache) {
-      needs.push({
-        turn: turn + 1,
-        board: validMoves.get(move),
-        player: opponent,
+    let optimalMove;
+    const board = validMoves.get(move);
+    const nextPlayer = hasValidMoves(board, opponent) ? opponent : player;
+    if (pullFromCache) {
+      const stateHash = stateToByteArray({
+        board,
+        player: nextPlayer,
       });
+      optimalMove = await nextTurnCollection.findOne({
+        state: stateHash,
+      });
+      if (!optimalMove) {
+        await nextTurnCollection.updateOne(
+          { state: stateHash },
+          { $set: {} },
+          { upsert: true }
+        );
+        needMoreCache = true;
+      }
+    } else {
+      optimalMove = await getOptimalMove(board, turn + 1, nextPlayer);
     }
-    if (needs.length > 0) {
+    if (needMoreCache) {
       continue;
     }
     if (best === null) {
@@ -68,14 +76,14 @@ const getOptimalMove = async (board, turn, player, skippedLastTurn) => {
 };
 
 const move = await getOptimalMove(board, turn, player);
-if (needs.length > 0) {
-  parentPort.postMessage(needs);
-} else if (turn > 0 && turn % (SIZE * SIZE) === 0) {
+if (turn > 0 && turn % (SIZE * SIZE) === 0) {
   await collection.updateOne(
     { state: stateToByteArray({ board, player }) },
     { $set: { move: move.move, score: move.score } },
     { upsert: true }
   );
 }
-parentPort.postMessage(move);
+if (!needMoreCache && postReturnValue) {
+  parentPort.postMessage(needs);
+}
 exit();
