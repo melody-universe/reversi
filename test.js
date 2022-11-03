@@ -1,36 +1,39 @@
-import { exit } from "process";
-import clear from "./cache/clear";
-import connect, { client } from "./cache/connect";
-import report from "./cache/report";
-import setup from "./cache/setup";
-import { PLAYER_NAMES, SIZE } from "./constants";
-import drawBoard from "./draw-board";
-import byteArrayToState from "./math/byte-array-to-state";
+const size = 4;
+const digitWidth = Math.ceil(Math.log10(size * size + 1));
+const matrix = Array.from({ length: size * size }, (_, i) => i + 1);
 
-await connect();
-const database = client.db(`reversi-${SIZE}`);
-const collections = await database.collections();
-await Promise.all(
-  collections.map(async (collection) => {
-    const doc = await collection.findOne({
-      score: { $exists: true },
-    });
-    if (!doc) {
-      return;
+drawMatrix(matrix);
+
+console.log("");
+
+const rotated = rotateMatrix(matrix);
+drawMatrix(rotated);
+
+function drawMatrix(matrix) {
+  for (let y = 0; y < size; y++) {
+    const row = [];
+    for (let x = 0; x < size; x++) {
+      row.push(matrix[y * size + x]);
     }
-    const { board, player } = byteArrayToState(doc.state.buffer);
-    console.log(`${collection.collectionName}:`);
-    drawBoard(board);
-    console.log(`Player: ${PLAYER_NAMES[player]}`);
-    console.log(`Best move: ${doc.move}`);
-    console.log(`Score: ${doc.score}`);
-  })
-);
-// await setup();
-// await report();
-/*const collection = await collections.get(4);
-const doc = await collection.find().next();
-console.log(doc);*/
-// await clear();
-await client.close();
-exit();
+    console.log(
+      `| ${row.map((i) => `${i}`.padStart(digitWidth)).join(", ")} |`
+    );
+  }
+}
+
+function rotateMatrix(matrix) {
+  const newMatrix = new Array(matrix.length);
+  for (let y = 0; y < Math.ceil(size / 2); y++) {
+    for (let x = 0; x < Math.floor(size / 2); x++) {
+      newMatrix[(size - 1 - x) * size + y] = matrix[(size - y) * size - x - 1];
+      newMatrix[(size - y) * size - x - 1] = matrix[(y + 1) * size - x - 1];
+      newMatrix[(x + 1) * size - 1 - y] = matrix[y * size + x];
+      newMatrix[y * size + x] = matrix[(size - 1 - x) * size + y];
+    }
+  }
+  if ((size & 1) === 1) {
+    const midPoint = Math.floor(size / 2) * size + Math.floor(size / 2);
+    newMatrix[midPoint] = matrix[midPoint];
+  }
+  return newMatrix;
+}
