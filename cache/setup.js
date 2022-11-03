@@ -1,34 +1,20 @@
-import { Collection, Db } from "mongodb";
-import connect, { client } from "./connect";
-import { CACHE_TURN_FREQUENCY, SIZE } from "../constants";
+import { Collection } from "mongodb";
+import connect, { database } from "./connect";
+import { SIZE } from "../constants";
 
-/** @type {Db} */
-export let database;
-
-/** @type {Map<number, Collection>} */
-export const collections = new Map();
+/** @type {Collection} */
+export let collection;
 
 const setup = async () => {
   await connect();
-  database = client.db(`reversi-${SIZE}`);
-  const existingCollections = new Set(
-    (await database.collections()).map(
-      (collection) => collection.collectionName
-    )
-  );
-  for (
-    let turn = CACHE_TURN_FREQUENCY;
-    turn < SIZE * SIZE - 4;
-    turn += CACHE_TURN_FREQUENCY
-  ) {
-    const collectionName = `turn-${turn}`;
-    const collection = database.collection(collectionName);
-    if (!existingCollections.has(collectionName)) {
-      await collection.insertOne({});
-      await collection.createIndex({ state: 1 }, { unique: true });
-      await collection.deleteOne({});
-    }
-    collections.set(turn, collection);
+  const collectionName = `size-${SIZE}`;
+  collection = database.listCollections({ collectionName })?.[0];
+  if (!collection) {
+    collection = database.collection(collectionName);
+    await collection.insertOne({});
+    await collection.createIndex({ state: 1 }, { unique: true });
+    await collection.createIndex({ turn: 1 }, { unique: false });
+    await collection.deleteOne({});
   }
 };
 export default setup;

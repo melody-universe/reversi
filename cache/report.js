@@ -1,21 +1,34 @@
-import { collections } from "./setup";
+import { EOL } from "os";
+import { CACHE_TURNS } from "../constants";
+import { collection } from "./setup";
 
 const report = async () => {
-  const turns = [...collections.keys()];
-  turns.sort((a, b) => a - b);
   const counts = await Promise.all(
-    turns.map(async (turn) => {
-      const collection = collections.get(turn);
-      const [calced, total] = await Promise.all([
-        collection.countDocuments({ score: { $exists: true } }),
-        collection.countDocuments(),
-      ]);
-      const report = `${calced.toString().padStart(8)} / ${total
-        .toString()
-        .padEnd(8)} (${((calced / total) * 100).toFixed(1).padStart(5)}%)`;
-      return report;
-    })
+    CACHE_TURNS.map((turn) =>
+      Promise.all([
+        collection.countDocuments({
+          turn: { $eq: turn },
+          score: { $exists: true },
+        }),
+        collection.countDocuments({
+          turn: { $eq: turn },
+        }),
+      ])
+    )
   );
-  return turns.map((turn, index) => ({ turn, count: counts[index] }));
+  const largestNumber = Math.max(...counts.map(([_, num]) => num));
+  const largestNumberLength = Math.ceil(Math.log10(largestNumber + 1));
+  const decimals = Math.max(largestNumberLength - 5, 0);
+  return CACHE_TURNS.map((turn, i) => {
+    const calculated = counts[i][0];
+    const total = counts[i][1];
+    return `${turn}: ${calculated
+      .toString()
+      .padStart(largestNumberLength)} / ${total
+      .toString()
+      .padEnd(largestNumberLength)} (${((calculated / total) * 100)
+      .toFixed(decimals)
+      .padStart(decimals + (decimals === 0 ? 3 : 4))}%)`;
+  }).join(EOL);
 };
 export default report;

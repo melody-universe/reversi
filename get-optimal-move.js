@@ -1,12 +1,13 @@
 import { Worker } from "worker_threads";
 import { CACHE_TURN_FREQUENCY, MAX_THREAD_COUNT, SIZE } from "./constants";
 import stateToByteArray from "./math/state-to-byte-array";
-import setup, { collections } from "./cache/setup";
+import setup, { collection } from "./cache/setup";
 import report from "./cache/report";
 import byteArrayToState from "./math/byte-array-to-state";
 
 const getOptimalMove = async (board, turn, player) => {
   await setup();
+  return;
   if (collections.has(turn)) {
     const turnCollection = collections.get(turn);
     const stateHash = stateToByteArray({ board, player });
