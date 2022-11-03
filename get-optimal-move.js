@@ -7,6 +7,25 @@ import byteArrayToState from "./math/byte-array-to-state";
 
 const getOptimalMove = async (board, turn, player) => {
   await setup();
+
+  const availableWorkers = [];
+  for (let i = 0; i < MAX_THREAD_COUNT; i++) {
+    const worker = new Worker("./get-optimal-move-service.js");
+    worker.on("message", ({ type, ...data }) => {
+      switch (type) {
+        case "done":
+          availableWorkers.push(worker);
+          break;
+      }
+    });
+    worker.on("exit", (exitCode) => {
+      if (exitCode !== 0) {
+        throw new Error(`Worker exited with non-zero exit code: ${exitCode}`);
+      }
+    });
+  }
+
+  const mainWorker = queueWorker();
   return;
   if (collections.has(turn)) {
     const turnCollection = collections.get(turn);
